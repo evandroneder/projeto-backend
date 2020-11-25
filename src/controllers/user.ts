@@ -2,8 +2,6 @@ import * as userCollection from "@collections/users/users";
 import { IRequestUpdateUser, IRegisterRequest } from "@interfaces/request/user";
 import { IRequest, IResponse } from "@interfaces/http/core";
 import { GetRouter } from "nd5-mongodb-server/core";
-import { IUser } from "@interfaces/collection/user";
-import { IPostResponse } from "@interfaces/request/post";
 
 const router = GetRouter();
 
@@ -11,19 +9,7 @@ router.get("/profile", async (req: IRequest, res: IResponse) => {
   try {
     const session = req.session;
 
-    var userData: {
-      data: IUser;
-      posts: IPostResponse[];
-      myProfile: boolean;
-      following: boolean;
-    } = {
-      data: undefined,
-      posts: undefined,
-      myProfile: undefined,
-      following: false,
-    };
-
-    userData.data = await userCollection.getUser([
+    const user = await userCollection.getUser([
       {
         $match: {
           _id: session.userId,
@@ -32,15 +18,13 @@ router.get("/profile", async (req: IRequest, res: IResponse) => {
       {
         $project: {
           password: 0,
-          notificationSubscription: 0,
         },
       },
     ]);
 
-    if (!userData.data)
-      return res.badRequest(`Usuário '${name}' não encontrado.`);
+    if (!user) return res.badRequest(`Usuário '${name}' não encontrado.`);
 
-    res.ok(userData);
+    res.ok(user);
   } catch (e) {
     res.error(e);
   }
@@ -68,24 +52,18 @@ router.put("/", async (req: IRequest, res: IResponse) => {
   }
 });
 
-router.get("/settings", async (req: IRequest, res: IResponse) => {
+router.get("/service", async (req: IRequest, res: IResponse) => {
   try {
-    const session = req.session;
-    let user = await userCollection.getUser([
-      {
-        $match: {
-          _id: session.userId,
-        },
-      },
+    let users = await userCollection.getAllUsers([
+      { $match: { "services.id": Number(req.query.id) } },
       {
         $project: {
-          _id: 0,
           password: 0,
         },
       },
     ]);
 
-    res.ok(user);
+    res.ok(users);
   } catch (e) {
     res.error(e);
   }

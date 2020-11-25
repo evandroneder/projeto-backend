@@ -41,6 +41,7 @@ export async function createUser(user: IRegisterRequest) {
       type: user.type,
       phone: user.phone,
       services: user.services,
+      nota: 0,
     };
     await collection.insertOne(newUser);
   } catch (e) {
