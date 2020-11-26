@@ -15,3 +15,11 @@ export interface IRegisterRequest {
   type: string;
   services?: string[];
 }
+
+export interface IContractRequest {
+  _id: string;
+  userId: ObjectId;
+  description: string;
+  name: string;
+  phone: string;
+}

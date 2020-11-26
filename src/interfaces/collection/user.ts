@@ -6,7 +6,8 @@ export interface IUser {
   type?: string;
   phone?: string;
   services?: string[];
-  nota: number;
+  avaliacoes: number[];
+  nota?: number;
 }
 
 export enum userType {

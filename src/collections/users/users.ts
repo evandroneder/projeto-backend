@@ -1,11 +1,16 @@
 import { getColletion } from "nd5-mongodb-server/mongo";
 import { environment } from "@env/environment.prod";
-import { IRequestUpdateUser, IRegisterRequest } from "@interfaces/request/user";
+import {
+  IRequestUpdateUser,
+  IRegisterRequest,
+  IContractRequest,
+} from "@interfaces/request/user";
 
-import { IUser } from "@interfaces/collection/user";
+import { IUser, userType } from "@interfaces/collection/user";
 
 import { encrypt } from "@lib/crypto";
 import { ObjectId } from "mongodb";
+import { generateUUID } from "@lib/session";
 
 const { collection } = getColletion({
   collection: "users",
@@ -41,7 +46,7 @@ export async function createUser(user: IRegisterRequest) {
       type: user.type,
       phone: user.phone,
       services: user.services,
-      nota: 0,
+      avaliacoes: [],
     };
     await collection.insertOne(newUser);
   } catch (e) {
@@ -49,21 +54,74 @@ export async function createUser(user: IRegisterRequest) {
   }
 }
 
-export async function updateUser(payload: IRequestUpdateUser) {
+export async function addContract(payload: IContractRequest) {
   try {
-    if (payload.password) payload.password = encrypt(payload.password);
-    else delete payload.password;
-    const build = (payload) => {
-      delete payload._id;
-      return payload;
-    };
+    const user = await getUser([{ $match: { _id: payload.userId } }]);
 
-    await collection.findOneAndUpdate(
+    if (user.type === userType.empresa) {
+      throw "Usuários do tipo empresa não podem contratar um serviço.";
+    }
+
+    const guid = generateUUID();
+    await collection.updateOne(
+      { _id: payload.userId },
+      {
+        $push: {
+          contracts: {
+            _id: new ObjectId(payload._id),
+            guid,
+            description: payload.description,
+            name: payload.name,
+            pending: true,
+            phone: payload.phone,
+          },
+        },
+      }
+    );
+
+    await collection.updateOne(
       { _id: new ObjectId(payload._id) },
-      { $set: build(payload) }
+      {
+        $push: {
+          contracts: {
+            _id: user._id,
+            name: user.name,
+            description: payload.description,
+            pending: true,
+            guid,
+            phone: user.phone,
+          },
+        },
+      }
     );
   } catch (e) {
-    throw "Erro atualizando usuário: " + e;
+    throw "Erro ao contratar serviço: " + e;
+  }
+}
+
+export async function endContract(payload: {
+  guid: string;
+  nota;
+  _id: string;
+}) {
+  try {
+    await collection.updateMany(
+      { "contracts.guid": payload.guid },
+      {
+        $set: { "contracts.$.pending": false },
+      }
+    );
+
+    await collection.updateOne(
+      { _id: new ObjectId(payload._id) },
+      {
+        $push: {
+          avaliacoes: payload.nota,
+        },
+      }
+    );
+  } catch (e) {
+    throw "Erro ao finalizar serviço: " + e;
   }
 }
 
